@@ -2,8 +2,8 @@
 " Language:     doxygen on top of c, cpp, idl, java
 " Maintainer:   Michael Geddes <michaelrgeddes@optushome.com.au>
 " Author:       Michael Geddes
-" Last Change:  11 December 2004
-" Version:      1.8
+" Last Change:  8 January 2005
+" Version:      1.9
 "
 " Copyright 2004 Michael Geddes
 " Please feel free to use, modify & distribute all or part of this script,
@@ -28,6 +28,12 @@
 " words - a 'typewriter' like font normally. Spaces must be escaped.  It can
 " also be set to any hilight attribute. Alternatively, a hilight for doxygenCodeWord
 " can be used to override it.
+"
+" By default, hilighting is done assumng you have the JAVADOC_AUTOBRIEF
+" setting tunred on in your Doxygen configuration.  If you don't, you
+" can set the variable g:doxygen_javadoc_autobrief to 0 to have the
+" hilighting more accurately reflect the way Doxygen will interpret your
+" comments.
 "
 " Usage:
 "
@@ -136,6 +142,9 @@
 "   - Fix up some regions not marked as contained (code, verbatim, dot being
 "   hilighted outside of the doxygen region) (Toby Allsopp)
 "   - Only mark recognised HTML tags (Suggested by Mike Anderson)
+" 1.9
+"   - Allow javadoc style auto-brief to be disabled (Toby Allsopp)
+"   - Move various definitions from single to multiline definitions (Toby Allsopp)
 "
 if exists('b:suppress_doxygen')
   unlet b:suppress_doxygen
@@ -169,7 +178,11 @@ syn match doxygenStartSkip2 +^\s*\*$+ contained nextgroup=doxygenBody,doxygenSta
 syn match doxygenStart2 +/\*[*!]+ contained nextgroup=doxygenBody,doxygenPrev,doxygenStartSpecial,doxygenStartSkip2 skipwhite skipnl
 
 " Match the Starting pattern (effectively creating the start of a BNF)
-syn match doxygenStart +/\*[*!]+ contained nextgroup=doxygenBrief,doxygenPrev,doxygenFindBriefSpecial,doxygenStartSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
+if !exists('g:doxygen_javadoc_autobrief') || g:doxygen_javadoc_autobrief
+  syn match doxygenStart +/\*[*!]+ contained nextgroup=doxygenBrief,doxygenPrev,doxygenFindBriefSpecial,doxygenStartSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
+else
+  syn match doxygenStart +/\*[*!]+ contained nextgroup=doxygenBody,doxygenPrev,doxygenFindBriefSpecial,doxygenStartSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
+endif
 syn match doxygenStartL +//[/!]+ contained nextgroup=doxygenPrevL,doxygenBriefL,doxygenSpecial skipwhite
 
 " This helps with sync-ing as for some reason, syncing behaves differently to a normal region, and the start pattern does not get matched.
@@ -211,8 +224,13 @@ syn match doxygenErrorComment contained +\*/+
 
 
 " Skip empty lines at the start for when comments start on the 2nd/3rd line.
-syn match doxygenStartSkip +^\s*\*[^/]+me=e-1 contained nextgroup=doxygenBrief,doxygenStartSpecial,doxygenFindBriefSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
-syn match doxygenStartSkip +^\s*\*$+ contained nextgroup=doxygenBrief,doxygenStartSpecial,doxygenFindBriefSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
+if !exists('g:doxygen_javadoc_autobrief') || g:doxygen_javadoc_autobrief
+  syn match doxygenStartSkip +^\s*\*[^/]+me=e-1 contained nextgroup=doxygenBrief,doxygenStartSpecial,doxygenFindBriefSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
+  syn match doxygenStartSkip +^\s*\*$+ contained nextgroup=doxygenBrief,doxygenStartSpecial,doxygenFindBriefSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
+else
+  syn match doxygenStartSkip +^\s*\*[^/]+me=e-1 contained nextgroup=doxygenStartSpecial,doxygenFindBriefSpecial,doxygenStartSkip,doxygenPage,doxygenBody skipwhite skipnl
+  syn match doxygenStartSkip +^\s*\*$+ contained nextgroup=doxygenStartSpecial,doxygenFindBriefSpecial,doxygenStartSkip,doxygenPage,doxygenBody skipwhite skipnl
+endif
 
 " Match an [@\]brief so that it moves to body-mode.
 "
@@ -280,16 +298,15 @@ unlet b:doxygen_syntax_save
 syn region doxygenDotRegion contained matchgroup=doxygenOther start=+\<dot\>+ matchgroup=doxygenOther end=+[\\@]\@<=\<enddot\>+ contains=doxygenDotRegionSpecial,doxygenErrorComment,doxygenContinueComment,@Dotx
 syn match doxygenDotRegionSpecial contained +[\\@]\(enddot\>\)\@=+ 
 
-" Match multiline identifiers.
+" Match single line identifiers.
 syn keyword doxygenBOther contained class enum file fn mainpage interface
-\ namespace struct typedef union var def name invariant note post pre remarks
-\ since test
+\ namespace struct typedef union var def name 
 \ nextgroup=doxygenSpecialTypeOnelineDesc
 
 syn keyword doxygenOther contained par nextgroup=doxygenHeaderLine
 syn region doxygenHeaderLine start=+.+ end=+^+ contained skipwhite nextgroup=doxygenSpecialMultilineDesc
 
-syn keyword doxygenOther contained arg author date deprecated li return see nextgroup=doxygenSpecialMultilineDesc
+syn keyword doxygenOther contained arg author date deprecated li return see invariant note post pre remarks since test nextgroup=doxygenSpecialMultilineDesc
 syn keyword doxygenOtherTODO contained todo attention nextgroup=doxygenSpecialMultilineDesc
 syn keyword doxygenOtherWARN contained warning nextgroup=doxygenSpecialMultilineDesc
 syn keyword doxygenOtherBUG contained bug nextgroup=doxygenSpecialMultilineDesc
