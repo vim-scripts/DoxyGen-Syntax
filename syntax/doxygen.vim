@@ -2,8 +2,8 @@
 " Language:     doxygen on top of c, cpp, idl, java
 " Maintainer:   Michael Geddes <michaelrgeddes@optushome.com.au>
 " Author:       Michael Geddes
-" Last Change:  11 August 2004
-" Version:      1.7
+" Last Change:  11 December 2004
+" Version:      1.8
 "
 " Copyright 2004 Michael Geddes
 " Please feel free to use, modify & distribute all or part of this script,
@@ -79,9 +79,6 @@
 " au! Syntax {cpp,c,idl} 
 " au Syntax {cpp,c,idl} runtime syntax/doxygen.vim 
 " ------------------------------------------------------------ 
-"
-" Caveats:
-"     Dot (between \dot \enddot) syntax doesn't support leading '*'
 
 "
 " History:
@@ -133,16 +130,13 @@
 "   - Try and match # and \c &c support to match what really happens. (Reported by Wu Yongwei)
 "   - Don't go into doxygen mode for /**/
 "   - Fix up syncing of brief after a \def or similar line - character
-"     immediately following a leading asterisk were being hilighted long.
+"   immediately following a leading asterisk were being hilighted long.
 "   - Try and work out a better default font for \c
-"   - add support for \code \endcode \verbatim \endverbatim (no contained elements) (suggested Yongwei)
-"   - add contained support for dot (\dot \enddot)
-"   - support html <!-- --> comments.
-"   - support for params inside \c \ref brackets (can contain spaces?).
-"   - highlight closing */ as error when found inside \code, \verbatim sections as well as \c, \ref sections with
-"     unmatched brackets. 
+" 1.8
+"   - Fix up some regions not marked as contained (code, verbatim, dot being
+"   hilighted outside of the doxygen region) (Toby Allsopp)
+"   - Only mark recognised HTML tags (Suggested by Mike Anderson)
 "
-
 if exists('b:suppress_doxygen')
   unlet b:suppress_doxygen
   finish
@@ -189,8 +183,8 @@ syn region doxygenBriefL start=+@\k\@!\|[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f
 syn region doxygenBriefLine contained start=+\<\k+ skip=+^\s*\(\*[^/]\)\=\s*\([@\\]ar[^g]\|[^ \t\*]\)+ end=+^+ contains=doxygenContinueComment,doxygenErrorComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipwhite keepend
 
 " Match a '<' for applying a comment to the previous element.
-syn match doxygenPrev +\*\@<=<+ contained nextgroup=doxygenBrief,doxygenSpecial,doxygenStartSkip skipwhite
-syn match doxygenPrevL +\*\@<=<+ contained  nextgroup=doxygenBriefL,doxygenSpecial skipwhite
+syn match doxygenPrev +<+ contained nextgroup=doxygenBrief,doxygenSpecial,doxygenStartSkip skipwhite
+syn match doxygenPrevL +<+ contained  nextgroup=doxygenBriefL,doxygenSpecial skipwhite
 
 " These are anti-doxygen comments.  If there are more than two asterisks or 3 '/'s
 " then turn the comments back into normal C comments.
@@ -231,11 +225,12 @@ syn region doxygenFindBriefSpecial start=+[@\\]brief\>+ skip=+^\s*\(\*[^/]\)\=\s
 
 fun! s:DxyCreateSmallSpecial( kword, name )
 
-  let mx='[-:0-9A-Za-z_,%=&+*/!~>|]\@<!\([-0-9A-Za-z_,%=+*/!~>|]\+[-0-9A-Za-z_,%=+*/!~>|]\@!\|\\[\\<>&.]@\|\.[0-9a-zA-Z_]\@=\|::\|([^)]*)\|&[0-9a-zA-Z]\{2,7};\)\+'
-  exe 'syn region doxygenSpecial'.a:name.'Word contained start=+'.a:kword.'+ end=+\(\_s\+'.mx.'\)\@<=[-a-zA-Z_0-9+*/^%|~!=(&\\]\@!+ skipwhite contains=doxygenContinueComment,doxygen'.a:name.'Word'
-  exe 'syn match doxygen'.a:name.'Word contained "\_s\@<='.mx.'" contains=doxygenHtmlSpecial,doxygenErrorComment keepend'
+  let mx='[-:0-9A-Za-z_,%=&+*/!~>|]\@<!\([-0-9A-Za-z_,%=+*/!~>|]\+[-0-9A-Za-z_,%=+*/!~>|]\@!\|\\[\\<>&.]@\|\.[0-9a-zA-Z_]\@=\|::\|()\|&[0-9a-zA-Z]\{2,7};\)\+'
+  " let mx='\(\<operator\(-\(\\\=>\|&gt;\)\*\=\|\\\=\([,%-=+*/!~|]\|\(&amp;\)\)=\=\|||\|&amp;&amp;\|\&\&\|\([\\<=>]\|&[gl]t;\)\{1,3}\|()\)\|\.[0-9a-zA-Z_]\@=\|[a-zA-Z0-9_]\+\|::\|()\|&[0-9a-zA-Z]\{2,7};\)\+'
+  " exe 'syn region doxygenSpecial'.a:name.'Word contained start=+\<'.a:kword.'+ end=+\(\_s\+[-a-zA-Z_:0-9+*/^%|~!=]\+\)\@<=[-a-zA-Z_:0-9+*/^%|~!=]\@!+ skipwhite contains=doxygenContinueComment,doxygen'.a:name.'Word'
+  exe 'syn region doxygenSpecial'.a:name.'Word contained start=+'.a:kword.'+ end=+\(\_s\+'.mx.'\)\@<=[-a-zA-Z_0-9+*/^%|~!=()&\\]\@!+ skipwhite contains=doxygenContinueComment,doxygen'.a:name.'Word'
+  exe 'syn match doxygen'.a:name.'Word contained "\_s\@<='.mx.'" contains=doxygenHtmlSpecial keepend'
 endfun
-
 call s:DxyCreateSmallSpecial('p', 'Code')
 call s:DxyCreateSmallSpecial('c', 'Code')
 call s:DxyCreateSmallSpecial('b', 'Bold')
@@ -259,9 +254,8 @@ syn match doxygenErrorSpecial contained +\s+
 " Match Parmaters and retvals (hilighting the first word as special).
 syn match doxygenParamDirection contained +\[\(\<in\>\|\<out\>\|,\)\+\]+ nextgroup=doxygenParamName skipwhite
 syn keyword doxygenParam contained param nextgroup=doxygenParamName,doxygenParamDirection skipwhite
-syn match doxygenParamName contained +[A-Za-z0-9_:]\++ nextgroup=doxygenSpecialMultilineDesc,doxygenParamSkipNl  skipwhite
+syn match doxygenParamName contained +[A-Za-z0-9_:]\++ nextgroup=doxygenSpecialMultilineDesc skipwhite
 syn keyword doxygenRetval contained retval throw exception nextgroup=doxygenParamName skipwhite
-syn match doxygenParamSkipNl contained +\_s\{-}\(\_^\s*\*\)\=\([@\\]\(\<[pcbea]\>\|\<em\>\|\<ref\>\|\<link\>\|f\$\|[$\\&<>#]\)\@=\|\([@\\]\|\s\)\@!\)+ nextgroup=doxygenSpecialMultilineDesc
 
 " Match one line identifiers.
 syn keyword doxygenOther contained addindex anchor
@@ -272,19 +266,19 @@ syn keyword doxygenOther contained addindex anchor
 \ xmlonly endxmlonly
 \ nextgroup=doxygenSpecialOnelineDesc
 
-syn region doxygenCodeRegion matchgroup=doxygenOther start=+\<code\>+ matchgroup=doxygenOther end=+[\\@]\@<=\<endcode\>+ contains=doxygenCodeRegionSpecial,doxygenContinueComment,doxygenErrorComment
-syn match doxygenCodeRegionSpecial +[\\@]\(endcode\>\)\@=+ 
+syn region doxygenCodeRegion contained matchgroup=doxygenOther start=+\<code\>+ matchgroup=doxygenOther end=+[\\@]\@<=\<endcode\>+ contains=doxygenCodeRegionSpecial,doxygenContinueComment,doxygenErrorComment
+syn match doxygenCodeRegionSpecial contained +[\\@]\(endcode\>\)\@=+ 
 
-syn region doxygenVerbatimRegion matchgroup=doxygenOther start=+\<verbatim\>+ matchgroup=doxygenOther end=+[\\@]\@<=\<endverbatim\>+ contains=doxygenVerbatimRegionSpecial,doxygenContinueComment,doxygenErrorComment
-syn match doxygenVerbatimRegionSpecial +[\\@]\(endverbatim\>\)\@=+ 
+syn region doxygenVerbatimRegion contained matchgroup=doxygenOther start=+\<verbatim\>+ matchgroup=doxygenOther end=+[\\@]\@<=\<endverbatim\>+ contains=doxygenVerbatimRegionSpecial,doxygenContinueComment,doxygenErrorComment
+syn match doxygenVerbatimRegionSpecial contained +[\\@]\(endverbatim\>\)\@=+ 
 
 let b:doxygen_syntax_save=b:current_syntax
 unlet b:current_syntax
 syn include @Dotx syntax/dot.vim
 let b:current_syntax=b:doxygen_syntax_save
 unlet b:doxygen_syntax_save
-syn region doxygenDotRegion matchgroup=doxygenOther start=+\<dot\>+ matchgroup=doxygenOther end=+[\\@]\@<=\<enddot\>+ contains=doxygenDotRegionSpecial,doxygenErrorComment,doxygenContinueComment,@Dotx
-syn match doxygenDotRegionSpecial +[\\@]\(enddot\>\)\@=+ 
+syn region doxygenDotRegion contained matchgroup=doxygenOther start=+\<dot\>+ matchgroup=doxygenOther end=+[\\@]\@<=\<enddot\>+ contains=doxygenDotRegionSpecial,doxygenErrorComment,doxygenContinueComment,@Dotx
+syn match doxygenDotRegionSpecial contained +[\\@]\(enddot\>\)\@=+ 
 
 " Match multiline identifiers.
 syn keyword doxygenBOther contained class enum file fn mainpage interface
@@ -358,16 +352,15 @@ syn keyword doxygenTODO contained TODO README XXX FIXME
 
 " Supported HTML subset.  Not perfect, but okay.
 syn case ignore
-syn region doxygenHtmlTag contained matchgroup=doxygenHtmlCh start=+</\=\ze\k\+\>+ skip=+\\<\|\<\k\+=\("[^"]*"\|'[^']*\)+ end=+>+ contains=doxygenHtmlCmd,doxygenContinueComment,doxygenHtmlVar
+syn region doxygenHtmlTag contained matchgroup=doxygenHtmlCh start=+\v\</=\ze([biuap]|em|strong|img|br|center|code|dfn|d[ldt]|hr|h[0-3]|li|[ou]l|pre|small|sub|sup|table|tt|var|caption|src|alt|longdesc|name|height|width|usemap|ismap|href|type)>+ skip=+\\<\|\<\k\+=\("[^"]*"\|'[^']*\)+ end=+>+ contains=doxygenHtmlCmd,doxygenContinueComment,doxygenHtmlVar
 syn keyword doxygenHtmlCmd contained b i em strong u img a br p center code dfn dl dd dt hr h1 h2 h3 li ol ul pre small sub sup table tt var caption nextgroup=doxygenHtmlVar skipwhite
 syn keyword doxygenHtmlVar contained src alt longdesc name height width usemap ismap href type nextgroup=doxygenHtmlEqu skipwhite
 syn match doxygenHtmlEqu contained +=+ nextgroup=doxygenHtmlExpr skipwhite
 syn match doxygenHtmlExpr contained +"\(\\.\|[^"]\)*"\|'\(\\.\|[^']\)*'+ nextgroup=doxygenHtmlVar skipwhite
 syn case match
 syn match doxygenHtmlSpecial contained "&\(copy\|quot\|[AEIOUYaeiouy]uml\|[AEIOUYaeiouy]acute\|[AEIOUaeiouy]grave\|[AEIOUaeiouy]circ\|[ANOano]tilde\|szlig\|[Aa]ring\|nbsp\|gt\|lt\|amp\);"
-syn region doxygenHtmlComment start=+<!--+ end=+-->+ contains=doxygenContinueComment,doxygenErrorComment contained
 
-syn cluster doxygenHtmlGroup contains=doxygenHtmlCode,doxygenHtmlBold,doxygenHtmlUnderline,doxygenHtmlItalic,doxygenHtmlSpecial,doxygenHtmlTag,doxygenHtmlLink,doxygenHtmlComment
+syn cluster doxygenHtmlGroup contains=doxygenHtmlCode,doxygenHtmlBold,doxygenHtmlUnderline,doxygenHtmlItalic,doxygenHtmlSpecial,doxygenHtmlTag,doxygenHtmlLink
 
 syn cluster doxygenHtmlTop contains=@Spell,doxygenHtmlSpecial,doxygenHtmlTag,doxygenContinueComment
 " Html Support
@@ -448,76 +441,6 @@ if !exists("did_doxygen_syntax_inits")
     SynLink doxygenSpecial Special
     SynLink doxygenFormulaSpecial Special
     "SynColor doxygenFormulaSpecial ctermfg=DarkBlue guifg=DarkBlue
-    "
-    SynLink doxygenHtmlComment            Comment
-    SynLink doxygenTODO                   Todo
-    SynLink doxygenOtherTODO              Todo
-    SynLink doxygenOtherWARN              Todo
-    SynLink doxygenOtherBUG               Todo
-
-    SynLink doxygenErrorSpecial           Error
-    SynLink doxygenErrorEnd               Error
-    SynLink doxygenErrorComment           Error
-    SynLink doxygenLinkError              Error
-    SynLink doxygenBriefSpecial           doxygenSpecial
-    SynLink doxygenHashSpecial            doxygenSpecial
-    SynLink doxygenGroupDefineSpecial     doxygenSpecial
-    SynLink doxygenEndlinkSpecial         doxygenSpecial
-    SynLink doxygenCodeRegionSpecial      doxygenSpecial
-    SynLink doxygenVerbatimRegionSpecial  doxygenSpecial
-    SynLink doxygenGroupDefine            doxygenParam
-
-    SynLink doxygenSpecialMultilineDesc   doxygenSpecialOnelineDesc
-    SynLink doxygenFormulaEnds            doxygenSpecial
-    SynLink doxygenBold                   doxygenParam
-    SynLink doxygenBriefWord              doxygenParam
-    SynLink doxygenRetval                 doxygenParam
-    SynLink doxygenOther                  doxygenParam
-    SynLink doxygenStart                  doxygenComment
-    SynLink doxygenStart2                 doxygenStart
-    SynLink doxygenComment2               doxygenComment
-    SynLink doxygenCommentL               doxygenComment
-    SynLink doxygenContinueComment        doxygenComment
-    SynLink doxygenSpecialContinueComment doxygenComment
-    SynLink doxygenSkipComment            doxygenComment
-    SynLink doxygenEndComment             doxygenComment
-    SynLink doxygenStartL                 doxygenComment
-    SynLink doxygenPrevL                  doxygenPrev
-    SynLink doxygenBriefL                 doxygenBrief
-    SynLink doxygenBriefLine              doxygenBrief
-    SynLink doxygenHeaderLine             doxygenSpecialHeading
-    SynLink doxygenStartSkip              doxygenContinueComment
-    SynLink doxygenLinkWord               doxygenParamName
-    SynLink doxygenLinkRest               doxygenSpecialMultilineDesc
-    SynLink doxygenHashLink               doxygenLinkWord
-
-    SynLink doxygenPage                   doxygenSpecial
-    SynLink doxygenPagePage               doxygenBOther
-    SynLink doxygenPageIdent              doxygenParamName
-    SynLink doxygenPageDesc               doxygenSpecialTypeOnelineDesc
-
-    SynLink doxygenSpecialIdent           doxygenPageIdent
-    SynLink doxygenSpecialSectionDesc     doxygenSpecialMultilineDesc
-
-    SynLink doxygenSpecialRefWord         doxygenOther
-    SynLink doxygenRefWord                doxygenPageIdent
-    SynLink doxygenContinueLinkComment    doxygenComment
-
-    SynLink doxygenHtmlCh                 Function
-    SynLink doxygenHtmlCmd                Statement
-    SynLink doxygenHtmlBoldItalicUnderline     doxygenHtmlBoldUnderlineItalic
-    SynLink doxygenHtmlUnderlineBold           doxygenHtmlBoldUnderline
-    SynLink doxygenHtmlUnderlineItalicBold     doxygenHtmlBoldUnderlineItalic
-    SynLink doxygenHtmlUnderlineBoldItalic     doxygenHtmlBoldUnderlineItalic
-    SynLink doxygenHtmlItalicUnderline         doxygenHtmlUnderlineItalic
-    SynLink doxygenHtmlItalicBold              doxygenHtmlBoldItalic
-    SynLink doxygenHtmlItalicBoldUnderline     doxygenHtmlBoldUnderlineItalic
-    SynLink doxygenHtmlItalicUnderlineBold     doxygenHtmlBoldUnderlineItalic
-    SynLink doxygenHtmlLink                    Underlined
-
-    SynLink doxygenParamDirection              StorageClass
-
-
   endfun
   call s:Doxygen_Hilights_Base()
 
@@ -595,25 +518,94 @@ if !exists("did_doxygen_syntax_inits")
       SynLink doxygenSpecialHeading Statement
       SynLink doxygenPrev SpecialComment
     endif
-    if !exists("doxygen_my_rendering") && !exists("html_my_rendering")
-      SynColor doxygenBoldWord             term=bold cterm=bold gui=bold
-      SynColor doxygenEmphasisedWord       term=italic cterm=italic gui=italic
-      SynLink  doxygenArgumentWord         doxygenEmphasisedWord
-      SynLink  doxygenHtmlCode             doxygenCodeWord
-      SynLink  doxygenHtmlBold             doxygenBoldWord
-      SynColor doxygenHtmlBoldUnderline       term=bold,underline cterm=bold,underline gui=bold,underline
-      SynColor doxygenHtmlBoldItalic          term=bold,italic cterm=bold,italic gui=bold,italic
-      SynColor doxygenHtmlBoldUnderlineItalic term=bold,italic,underline cterm=bold,italic,underline gui=bold,italic,underline
-      SynColor doxygenHtmlUnderline        term=underline cterm=underline gui=underline
-      SynColor doxygenHtmlUnderlineItalic  term=italic,underline cterm=italic,underline gui=italic,underline
-      SynColor doxygenHtmlItalic           term=italic cterm=italic gui=italic
-    endif
   endfun
   call s:Doxygen_Hilights()
   " This is still a proposal, but won't do any harm.
   au Syntax UserColor_reset nested call s:Doxygen_Hilights_Base()
   au Syntax UserColor_{on,reset,enable} nested call s:Doxygen_Hilights()
 
+  SynLink doxygenBody                   Comment
+  SynLink doxygenTODO                   Todo
+  SynLink doxygenOtherTODO              Todo
+  SynLink doxygenOtherWARN              Todo
+  SynLink doxygenOtherBUG               Todo
+
+  SynLink doxygenErrorSpecial           Error
+  SynLink doxygenErrorEnd               Error
+  SynLink doxygenErrorComment           Error
+  SynLink doxygenLinkError              Error
+  SynLink doxygenBriefSpecial           doxygenSpecial
+  SynLink doxygenHashSpecial            doxygenSpecial
+  SynLink doxygenGroupDefineSpecial     doxygenSpecial
+  SynLink doxygenEndlinkSpecial         doxygenSpecial
+  SynLink doxygenCodeRegionSpecial      doxygenSpecial
+  SynLink doxygenVerbatimRegionSpecial  doxygenSpecial
+  SynLink doxygenGroupDefine            doxygenParam
+
+  SynLink doxygenSpecialMultilineDesc   doxygenSpecialOnelineDesc
+  SynLink doxygenFormulaEnds            doxygenSpecial
+  SynLink doxygenBold                   doxygenParam
+  SynLink doxygenBriefWord              doxygenParam
+  SynLink doxygenRetval                 doxygenParam
+  SynLink doxygenOther                  doxygenParam
+  SynLink doxygenStart                  doxygenComment
+  SynLink doxygenStart2                 doxygenStart
+  SynLink doxygenComment2               doxygenComment
+  SynLink doxygenCommentL               doxygenComment
+  SynLink doxygenContinueComment        doxygenComment
+  SynLink doxygenSpecialContinueComment doxygenComment
+  SynLink doxygenSkipComment            doxygenComment
+  SynLink doxygenEndComment             doxygenComment
+  SynLink doxygenStartL                 doxygenComment
+  SynLink doxygenPrevL                  doxygenPrev
+  SynLink doxygenBriefL                 doxygenBrief
+  SynLink doxygenBriefLine              doxygenBrief
+  SynLink doxygenHeaderLine             doxygenSpecialHeading
+  SynLink doxygenStartSkip              doxygenContinueComment
+  SynLink doxygenLinkWord               doxygenParamName
+  SynLink doxygenLinkRest               doxygenSpecialMultilineDesc
+  SynLink doxygenHashLink               doxygenLinkWord
+
+  SynLink doxygenPage                   doxygenSpecial
+  SynLink doxygenPagePage               doxygenBOther
+  SynLink doxygenPageIdent              doxygenParamName
+  SynLink doxygenPageDesc               doxygenSpecialTypeOnelineDesc
+
+  SynLink doxygenSpecialIdent           doxygenPageIdent
+  SynLink doxygenSpecialSectionDesc     doxygenSpecialMultilineDesc
+
+  SynLink doxygenSpecialRefWord         doxygenOther
+  SynLink doxygenRefWord                doxygenPageIdent
+  SynLink doxygenContinueLinkComment    doxygenComment
+
+  SynLink doxygenHtmlCh                 Function
+  SynLink doxygenHtmlCmd                Statement
+  SynLink doxygenHtmlBoldItalicUnderline     doxygenHtmlBoldUnderlineItalic
+  SynLink doxygenHtmlUnderlineBold           doxygenHtmlBoldUnderline
+  SynLink doxygenHtmlUnderlineItalicBold     doxygenHtmlBoldUnderlineItalic
+  SynLink doxygenHtmlUnderlineBoldItalic     doxygenHtmlBoldUnderlineItalic
+  SynLink doxygenHtmlItalicUnderline         doxygenHtmlUnderlineItalic
+  SynLink doxygenHtmlItalicBold              doxygenHtmlBoldItalic
+  SynLink doxygenHtmlItalicBoldUnderline     doxygenHtmlBoldUnderlineItalic
+  SynLink doxygenHtmlItalicUnderlineBold     doxygenHtmlBoldUnderlineItalic
+  SynLink doxygenHtmlLink                    Underlined
+
+  SynLink doxygenParamDirection              StorageClass
+
+
+  if !exists("doxygen_my_rendering") && !exists("html_my_rendering")
+    SynColor doxygenBoldWord             term=bold cterm=bold gui=bold
+    SynColor doxygenEmphasisedWord       term=italic cterm=italic gui=italic
+    SynLink  doxygenArgumentWord         doxygenEmphasisedWord
+    SynLink  doxygenHtmlCode             doxygenCodeWord
+    SynLink  doxygenHtmlBold             doxygenBoldWord
+    SynColor doxygenHtmlBoldUnderline       term=bold,underline cterm=bold,underline gui=bold,underline
+    SynColor doxygenHtmlBoldItalic          term=bold,italic cterm=bold,italic gui=bold,italic
+    SynColor doxygenHtmlBoldUnderlineItalic term=bold,italic,underline cterm=bold,italic,underline gui=bold,italic,underline
+    SynColor doxygenHtmlUnderline        term=underline cterm=underline gui=underline
+    SynColor doxygenHtmlUnderlineItalic  term=italic,underline cterm=italic,underline gui=italic,underline
+    SynColor doxygenHtmlItalic           term=italic cterm=italic gui=italic
+  endif
   delcommand SynLink
   delcommand SynColor
 endif
