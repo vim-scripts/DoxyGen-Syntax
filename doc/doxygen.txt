@@ -40,7 +40,7 @@ configuration.
 
 Highlight			Effect ~
 doxygenErrorComment		The colour of an end-comment when missing
-				punctuation in a brief comment section.
+				punctuation in a code, verbatim or dot section
 doxygenLinkError		The colour of an end-comment when missing the
 				\endlink from a \link section.
 

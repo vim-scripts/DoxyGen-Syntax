@@ -153,6 +153,9 @@
 "   - Make short words end with a , eg \c word,  (Wu Yongwei)
 " 1.11
 "   - Thanks to Joseph Barker for pointing out that I had a syntax error in  1.10
+" 1.12
+"   - Fixed up ending of brief lines with respect to line @ commands and
+"   end-comment. Not ending a brief no longer produces an error-comment.
 "
 "
 if exists('b:suppress_doxygen')
@@ -200,11 +203,13 @@ syn match doxygenSyncStart +\ze[^*/]+ contained nextgroup=doxygenBrief,doxygenPr
 if ! exists('g:doxygen_end_punctuation')
   let g:doxygen_end_punctuation='[.]'
 endif
-exe 'syn region doxygenBrief contained start=+[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@*]+ start=+\(^\s*\)\@<!\*/\@!+ start=+\<\k+ skip=+'.doxygen_end_punctuation.'\S+ end=+'.doxygen_end_punctuation.'+ contains=doxygenSmallSpecial,doxygenContinueComment,doxygenErrorComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipnl nextgroup=doxygenBody'
+exe 'syn region doxygenBrief contained start=+[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@*]+ start=+\(^\s*\)\@<!\*/\@!+ start=+\<\k+ skip=+'.doxygen_end_punctuation.'\S+ end=+'.doxygen_end_punctuation.'+ end=+\(\s*\(\n\s*\*\=\s*\)[@\\]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\@!\)\@=+ contains=doxygenSmallSpecial,doxygenContinueComment,doxygenBriefEndComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipnl nextgroup=doxygenBody'
+
+syn match doxygenBriefEndComment +\*/+ contained
 
 exe 'syn region doxygenBriefL start=+@\k\@!\|[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@]+ start=+\<+ skip=+'.doxygen_end_punctuation.'\S+ end=+'.doxygen_end_punctuation.'\|$+ contained contains=doxygenSmallSpecial,doxygenHashLink,@doxygenHtmlGroup keepend'
 
-syn region doxygenBriefLine contained start=+\<\k+ skip=+^\s*\(\*[^/]\)\=\s*\([@\\]ar[^g]\|[^ \t\*]\)+ end=+^+ contains=doxygenContinueComment,doxygenErrorComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipwhite keepend
+syn region doxygenBriefLine contained start=+\<\k+ end=+\(\n\s*\*\=\s*\([@\\]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\@!\)\|\s*$\)\@=+ contains=doxygenContinueComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipwhite keepend
 
 " Match a '<' for applying a comment to the previous element.
 syn match doxygenPrev +<+ contained nextgroup=doxygenBrief,doxygenSpecial,doxygenStartSkip skipwhite
@@ -227,8 +232,6 @@ syn region doxygenBody contained start=+.\|$+ matchgroup=doxygenEndComment end=+
 " These allow the skipping of comment continuation '*' characters.
 syn match doxygenContinueComment contained +^\s*\*/\@!\s*+
 
-"syn match doxygenErrorEnd contained +/+
-
 " Catch a Brief comment without punctuation - flag it as an error but
 " make sure the end comment is picked up also.
 syn match doxygenErrorComment contained +\*/+
@@ -248,13 +251,14 @@ endif
 "
 " syn match doxygenBriefLine  contained
 syn match doxygenBriefSpecial contained +[@\\]+ nextgroup=doxygenBriefWord skipwhite
-syn region doxygenFindBriefSpecial start=+[@\\]brief\>+ skip=+^\s*\(\*[^/]\)\=\s*\([@\\]ar[^g]\|[^ \t\*]\)+ end=+^+ keepend contains=doxygenBriefSpecial nextgroup=doxygenBody keepend skipwhite skipnl contained
+syn region doxygenFindBriefSpecial start=+[@\\]brief\>+ end=+\(\n\s*\*\=\s*\([@\\]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\@!\)\|\s*$\)\@=+ keepend contains=doxygenBriefSpecial nextgroup=doxygenBody keepend skipwhite skipnl contained
+
 
 " Create the single word matching special identifiers.
 
 fun! s:DxyCreateSmallSpecial( kword, name )
 
-  let mx='[-:0-9A-Za-z_%=&+*/!~>|]\@<!\([-0-9A-Za-z_%=+*/!~>|]\+[-0-9A-Za-z_%=+*/!~>|]\@!\|\\[\\<>&.]@\|[.,][0-9a-zA-Z_]\@=\|::\|()\|&[0-9a-zA-Z]\{2,7};\)\+'
+  let mx='[-:0-9A-Za-z_%=&+*/!~>|]\@<!\([-0-9A-Za-z_%=+*/!~>|]\+[-0-9A-Za-z_%=+*/!~>|]\@!\|\\[\\<>&.]@\|[.,][0-9a-zA-Z_]\@=\|::\|([^)]*)\|&[0-9a-zA-Z]\{2,7};\)\+'
   exe 'syn region doxygenSpecial'.a:name.'Word contained start=+'.a:kword.'+ end=+\(\_s\+'.mx.'\)\@<=[-a-zA-Z_0-9+*/^%|~!=()&\\]\@!+ skipwhite contains=doxygenContinueComment,doxygen'.a:name.'Word'
   exe 'syn match doxygen'.a:name.'Word contained "\_s\@<='.mx.'" contains=doxygenHtmlSpecial keepend'
 endfun
@@ -585,6 +589,7 @@ if !exists("did_doxygen_syntax_inits")
   SynLink doxygenSkipComment            doxygenComment
   SynLink doxygenEndComment             doxygenComment
   SynLink doxygenStartL                 doxygenComment
+  SynLink doxygenBriefEndComment        doxygenComment
   SynLink doxygenPrevL                  doxygenPrev
   SynLink doxygenBriefL                 doxygenBrief
   SynLink doxygenBriefLine              doxygenBrief
