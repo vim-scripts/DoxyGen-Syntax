@@ -2,8 +2,8 @@
 " Language:     doxygen on top of c, cpp, idl, java
 " Maintainer:   Michael Geddes <michaelrgeddes@optushome.com.au>
 " Author:       Michael Geddes
-" Last Change:  August 2004
-" Version:      1.5
+" Last Change:  11 August 2004
+" Version:      1.6
 "
 " Copyright 2004 Michael Geddes
 " Please feel free to use, modify & distribute all or part of this script,
@@ -116,6 +116,10 @@
 "     against a continuation '*' - it just gets tooo difficult).
 "   - Highlight a missing \endlink as an error.
 "   - Fix multiline desc without a '*' 
+" 1.6
+"   - Fix up # support.
+"   - Highlight \endlink properly.
+"   - Don't mark */ as an error where there is no brief, or @{ is used.
 "
 if exists('b:suppress_doxygen')
   unlet b:suppress_doxygen
@@ -136,7 +140,7 @@ set cpo&vim
 "syn region doxygenComment start=+/\*[*!]+  end=+\*/+ contains=doxygenStart,doxygenTODO keepend
 syn region doxygenComment start=+/\*[*!]+  		end=+\*/+ contains=doxygenSyncStart,doxygenStart,doxygenTODO keepend
 syn region doxygenCommentL start=+//[/!]+me=e-1 end=+$+ contains=doxygenStartL keepend skipwhite skipnl nextgroup=doxygenComment2
-syn region doxygenCommentL start=+//@[{}]+ end=+$+
+syn region doxygenCommentL start=+//@\ze[{}]+ end=+$+ contains=doxygenGroupDefine,doxygenGroupDefineSpecial
 
 " Single line brief followed by multiline comment.
 syn region doxygenComment2 start=+/\*[*!]+ end=+\*/+ contained contains=doxygenSyncStart2,doxygenStart2,doxygenTODO keepend
@@ -156,7 +160,7 @@ syn match doxygenStartL +//[/!]+ contained nextgroup=doxygenPrevL,doxygenBriefL,
 syn match doxygenSyncStart +[^*/]+ contained nextgroup=doxygenBrief,doxygenPrev,doxygenStartSpecial,doxygenFindBriefSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
 
 " Match the first sentence as a brief comment
-syn region doxygenBrief contained start=+[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@]+ start=+\<\k+ skip=+[.!]\S+ end=+[.!]+ contains=doxygenSmallSpecial,doxygenContinueComment,doxygenErrorComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipnl nextgroup=doxygenBody
+syn region doxygenBrief contained start=+[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@*]+ start=+\(^\s*\)\@<!\*/\@!+ start=+\<\k+ skip=+[.!]\S+ end=+[.!]+ contains=doxygenSmallSpecial,doxygenContinueComment,doxygenErrorComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipnl nextgroup=doxygenBody
 
 syn region doxygenBriefL start=+@\k\@!\|[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@]+ start=+\<+ skip=+[.!]\S+ end=+[.!]\|$+ contained contains=doxygenSmallSpecial,doxygenHashLink,@doxygenHtmlGroup keepend
 
@@ -216,12 +220,15 @@ call DxyCreateSmallSpecial('a', 'Argument')
 call DxyCreateSmallSpecial('ref', 'Ref')
 delfun DxyCreateSmallSpecial
 
-syn match doxygenSmallSpecial contained +[@\\]\<\([pcbea]\>\|em\>\|ref\|link\>\>\|f\$\|[$\\&<>#]\)\@=+ nextgroup=doxygenOtherLink,doxygenHashLink,doxygenFormula,doxygenSymbol,doxygenSpecial.*Word
+syn match doxygenSmallSpecial contained +[@\\]\(\<[pcbea]\>\|\<em\>\|\<ref\>\|\<link\>\|f\$\|[$\\&<>#]\)\@=+ nextgroup=doxygenOtherLink,doxygenHashLink,doxygenFormula,doxygenSymbol,doxygenSpecial.*Word
 
 " Now for special characters
-syn match doxygenSpecial contained +[@\\]\<\([pcbea]\>\|em\>\|ref\|link\>\>\|f\$\|[$\\&<>#]\)\@!+ nextgroup=doxygenParam,doxygenRetval,doxygenBriefWord,doxygenBold,doxygenBOther,doxygenOther,doxygenOtherTODO,doxygenOtherWARN,doxygenOtherBUG,doxygenPage
+syn match doxygenSpecial contained +[@\\]\(\<[pcbea]\>\|\<em\>\|\<ref\|\<link\>\>\|\<f\$\|[$\\&<>#]\)\@!+ nextgroup=doxygenParam,doxygenRetval,doxygenBriefWord,doxygenBold,doxygenBOther,doxygenOther,doxygenOtherTODO,doxygenOtherWARN,doxygenOtherBUG,doxygenPage,doxygenGroupDefine
 " doxygenOtherLink,doxygenSymbol,doxygenFormula,doxygenErrorSpecial,doxygenSpecial.*Word
 "
+syn match doxygenGroupDefine contained +@\@<=[{}]+
+syn match doxygenGroupDefineSpecial contained +@\ze[{}]+
+
 syn match doxygenErrorSpecial contained +\s+
 
 " Match Parmaters and retvals (hilighting the first word as special).
@@ -254,13 +261,15 @@ syn keyword doxygenOtherWARN contained warning nextgroup=doxygenSpecialMultiline
 syn keyword doxygenOtherBUG contained bug nextgroup=doxygenSpecialMultilineDesc
 
 " Handle \link, \endlink, hilighting the link-to and the link text bits separately.
-syn region doxygenOtherLink matchgroup=doxygenOther start=+link+ end=+[\@]endlink+ contained contains=doxygenLinkWord,doxygenContinueComment,doxygenLinkError
+syn region doxygenOtherLink matchgroup=doxygenOther start=+link+ end=+[\@]\@<=endlink\>+ contained contains=doxygenLinkWord,doxygenContinueComment,doxygenLinkError,doxygenEndlinkSpecial
+syn match doxygenEndlinkSpecial contained +[\\@]\zeendlink\>+
+
 syn match doxygenLinkWord "[_a-zA-Z:#()]\+\>" contained skipnl nextgroup=doxygenLinkRest,doxygenContinueLinkComment
-syn match doxygenLinkRest +[^*]\|\*/\@!+ contained skipnl nextgroup=doxygenLinkRest,doxygenContinueLinkComment
+syn match doxygenLinkRest +[^*@\\]\|\*/\@!\|[@\\]\(endlink\>\)\@!+ contained skipnl nextgroup=doxygenLinkRest,doxygenContinueLinkComment
 syn match doxygenContinueLinkComment contained +^\s*\*\=[^/]+me=e-1 nextgroup=doxygenLinkRest
 syn match doxygenLinkError "\*/" contained
 " #Link hilighting.
-syn match doxygenHashLink /#[:a-zA-Z0-9_][:a-zA-Z0-9_.-<>=()]*/ contained contains=doxygenHashSpecial
+syn match doxygenHashLink /#\(\<operator\([-<=+>]\{1,2}\|()\|->\|\.\)\|[a-zA-Z0-9_]\+\|::\|()\)\+/ contained contains=doxygenHashSpecial
 syn match doxygenHashSpecial /#/ contained
 
 " Handle \page.  This does not use doxygenBrief.
@@ -437,7 +446,8 @@ if !exists("did_doxygen_syntax_inits")
     endif
   endfun
   call s:Doxygen_Hilights()
-  " au Syntax UserColor_{on,reset,enable} nested call s:Doxygen_Hilights()
+  " This is still a proposal, but won't do any harm.
+  au Syntax UserColor_{on,reset,enable} nested call s:Doxygen_Hilights()
 
   SynLink doxygenBody                   Comment
   SynLink doxygenTODO                   Todo
@@ -451,6 +461,9 @@ if !exists("did_doxygen_syntax_inits")
   SynLink doxygenLinkError              Error
   SynLink doxygenBriefSpecial           doxygenSpecial
   SynLink doxygenHashSpecial            doxygenSpecial
+  SynLink doxygenGroupDefineSpecial     doxygenSpecial
+  SynLink doxygenEndlinkSpecial         doxygenSpecial
+  SynLink doxygenGroupDefine            doxygenParam
 
   SynLink doxygenSpecialMultilineDesc   doxygenSpecialOnelineDesc
   SynLink doxygenFormulaEnds            doxygenSpecial
