@@ -2,8 +2,8 @@
 " Language:     doxygen on top of c, cpp, idl, java
 " Maintainer:   Michael Geddes <michaelrgeddes@optushome.com.au>
 " Author:       Michael Geddes
-" Last Change:  8 January 2005
-" Version:      1.9
+" Last Change:  26 January 2005
+" Version:      1.10
 "
 " Copyright 2004 Michael Geddes
 " Please feel free to use, modify & distribute all or part of this script,
@@ -145,6 +145,15 @@
 " 1.9
 "   - Allow javadoc style auto-brief to be disabled (Toby Allsopp)
 "   - Move various definitions from single to multiline definitions (Toby Allsopp)
+" 1.10
+"   - Allow doxygen comments inside brackets (Suggested by Zygmunt Krynicki)
+"   - Restore correct font selection (Wu Yongwei)
+"   - Don't end brief when encountering ? or ! as this isn't what happens with doxygen.
+"   - Make punctuation an option.
+"   - Make short words end with a , eg \c word,  (Wu Yongwei)
+" 1.11
+"   - Thanks to Joseph Barker for pointing out that I had a syntax error in  1.10
+"
 "
 if exists('b:suppress_doxygen')
   unlet b:suppress_doxygen
@@ -162,7 +171,6 @@ set cpo&vim
 "
 
 " C/C++ Style line comments
-"syn region doxygenComment start=+/\*[*!]+  end=+\*/+ contains=doxygenStart,doxygenTODO keepend
 syn region doxygenComment start=+/\*\(\*/\)\@![*!]+  end=+\*/+ contains=doxygenSyncStart,doxygenStart,doxygenTODO keepend
 syn region doxygenCommentL start=+//[/!]+me=e-1 end=+$+ contains=doxygenStartL keepend skipwhite skipnl nextgroup=doxygenComment2
 syn region doxygenCommentL start=+//@\ze[{}]+ end=+$+ contains=doxygenGroupDefine,doxygenGroupDefineSpecial
@@ -189,9 +197,12 @@ syn match doxygenStartL +//[/!]+ contained nextgroup=doxygenPrevL,doxygenBriefL,
 syn match doxygenSyncStart +\ze[^*/]+ contained nextgroup=doxygenBrief,doxygenPrev,doxygenStartSpecial,doxygenFindBriefSpecial,doxygenStartSkip,doxygenPage skipwhite skipnl
 
 " Match the first sentence as a brief comment
-syn region doxygenBrief contained start=+[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@*]+ start=+\(^\s*\)\@<!\*/\@!+ start=+\<\k+ skip=+[.!]\S+ end=+[.!]+ contains=doxygenSmallSpecial,doxygenContinueComment,doxygenErrorComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipnl nextgroup=doxygenBody
+if ! exists('g:doxygen_end_punctuation')
+  let g:doxygen_end_punctuation='[.]'
+endif
+exe 'syn region doxygenBrief contained start=+[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@*]+ start=+\(^\s*\)\@<!\*/\@!+ start=+\<\k+ skip=+'.doxygen_end_punctuation.'\S+ end=+'.doxygen_end_punctuation.'+ contains=doxygenSmallSpecial,doxygenContinueComment,doxygenErrorComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipnl nextgroup=doxygenBody'
 
-syn region doxygenBriefL start=+@\k\@!\|[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@]+ start=+\<+ skip=+[.!]\S+ end=+[.!]\|$+ contained contains=doxygenSmallSpecial,doxygenHashLink,@doxygenHtmlGroup keepend
+exe 'syn region doxygenBriefL start=+@\k\@!\|[\\@]\([pcbea]\>\|em\>\|ref\>\|link\>\|f\$\|[$\\&<>#]\)\|[^ \t\\@]+ start=+\<+ skip=+'.doxygen_end_punctuation.'\S+ end=+'.doxygen_end_punctuation.'\|$+ contained contains=doxygenSmallSpecial,doxygenHashLink,@doxygenHtmlGroup keepend'
 
 syn region doxygenBriefLine contained start=+\<\k+ skip=+^\s*\(\*[^/]\)\=\s*\([@\\]ar[^g]\|[^ \t\*]\)+ end=+^+ contains=doxygenContinueComment,doxygenErrorComment,doxygenFindBriefSpecial,doxygenSmallSpecial,@doxygenHtmlGroup,doxygenTODO,doxygenOtherLink,doxygenHashLink  skipwhite keepend
 
@@ -243,9 +254,7 @@ syn region doxygenFindBriefSpecial start=+[@\\]brief\>+ skip=+^\s*\(\*[^/]\)\=\s
 
 fun! s:DxyCreateSmallSpecial( kword, name )
 
-  let mx='[-:0-9A-Za-z_,%=&+*/!~>|]\@<!\([-0-9A-Za-z_,%=+*/!~>|]\+[-0-9A-Za-z_,%=+*/!~>|]\@!\|\\[\\<>&.]@\|\.[0-9a-zA-Z_]\@=\|::\|()\|&[0-9a-zA-Z]\{2,7};\)\+'
-  " let mx='\(\<operator\(-\(\\\=>\|&gt;\)\*\=\|\\\=\([,%-=+*/!~|]\|\(&amp;\)\)=\=\|||\|&amp;&amp;\|\&\&\|\([\\<=>]\|&[gl]t;\)\{1,3}\|()\)\|\.[0-9a-zA-Z_]\@=\|[a-zA-Z0-9_]\+\|::\|()\|&[0-9a-zA-Z]\{2,7};\)\+'
-  " exe 'syn region doxygenSpecial'.a:name.'Word contained start=+\<'.a:kword.'+ end=+\(\_s\+[-a-zA-Z_:0-9+*/^%|~!=]\+\)\@<=[-a-zA-Z_:0-9+*/^%|~!=]\@!+ skipwhite contains=doxygenContinueComment,doxygen'.a:name.'Word'
+  let mx='[-:0-9A-Za-z_%=&+*/!~>|]\@<!\([-0-9A-Za-z_%=+*/!~>|]\+[-0-9A-Za-z_%=+*/!~>|]\@!\|\\[\\<>&.]@\|[.,][0-9a-zA-Z_]\@=\|::\|()\|&[0-9a-zA-Z]\{2,7};\)\+'
   exe 'syn region doxygenSpecial'.a:name.'Word contained start=+'.a:kword.'+ end=+\(\_s\+'.mx.'\)\@<=[-a-zA-Z_0-9+*/^%|~!=()&\\]\@!+ skipwhite contains=doxygenContinueComment,doxygen'.a:name.'Word'
   exe 'syn match doxygen'.a:name.'Word contained "\_s\@<='.mx.'" contains=doxygenHtmlSpecial keepend'
 endfun
@@ -416,9 +425,11 @@ syn region doxygenHtmlCode contained start="\c<code\>" end="\c</code>"me=e-7 con
 
 " Prevent the doxygen contained matches from leaking into the c groups.
 syn cluster cParenGroup add=doxygen.*
+syn cluster cParenGroup remove=doxygenComment,doxygenCommentL
 syn cluster cPreProcGroup add=doxygen.*
 syn cluster cMultiGroup add=doxygen.*
 syn cluster rcParenGroup add=doxygen.*
+syn cluster rcParenGroup remove=doxygenComment,doxygenCommentL
 syn cluster rcGroup add=doxygen.*
 
 " Trick to force special doxygen hilighting if the background changes (need to
@@ -462,44 +473,44 @@ if !exists("did_doxygen_syntax_inits")
   call s:Doxygen_Hilights_Base()
 
   fun! s:Doxygen_Hilights()
-    if (exists('g:doxygen_enhanced_color') && g:doxygen_enhanced_color) || (exists('g:doxygen_enhanced_colour') && g:doxygen_enhanced_colour)
-      " Pick a sensible default for 'codeword'.
-      let font=''
-      if exists('g:doxygen_codeword_font')
-        if g:doxygen_codeword_font !~ '\<\k\+='
-          let font='font='.g:doxygen_codeword_font
-        else
-          let font=g:doxygen_codeword_font
-        endif
+    " Pick a sensible default for 'codeword'.
+    let font=''
+    if exists('g:doxygen_codeword_font')
+      if g:doxygen_codeword_font !~ '\<\k\+='
+        let font='font='.g:doxygen_codeword_font
       else
-        " Try and pick a font (only windows have been tested).
-        if has('gui')
-          if has('gui_gtk2')
-            if &guifont == ''
-              let font="font='FreeSerif 12'"
-            else
-              let font="font='".substitute(&guifont, '^.\{-}\([0-9]\+\)$', 'FreeSerif \1','')."'"
-            endif
-
-          elseif has('gui_win32') || has('gui_win16') || has('gui_win95') || has('gui_gtk')
-            if &guifont == ''
-               let font='font=Lucida_Console:h10'
-            else
-              let font='font='.substitute(&guifont, '^[^:]*', 'Lucida_Console','')
-            endif
-          elseif has('gui_athena') || &guifont=~'^\(-[^-]\+\)\{14}'
-            if &guifont == ''
-              let font='font=-b&h-lucidatypewriter-medium-r-normal-*-*-140-*-*-m-*-iso8859-1' 
-            else 
-              let font='font='.substitute(&guifont,'^\(-[^-]\+\)\{5}', '-*-*-140-*-*-m-*-iso8859-1','')
-            endif
-          elseif has('gui_kde')
-            " let font='font=Bitstream\ Vera\ Sans\ Mono/12/-1/5/50/0/0/0/0/0'
+        let font=g:doxygen_codeword_font
+      endif
+    else
+      " Try and pick a font (only windows have been tested).
+      if has('gui')
+        if has('gui_gtk2')
+          if &guifont == ''
+            let font="font='FreeSerif 12'"
+          else
+            let font="font='".substitute(&guifont, '^.\{-}\([0-9]\+\)$', 'FreeSerif \1','')."'"
           endif
+
+        elseif has('gui_win32') || has('gui_win16') || has('gui_win95')
+          if &guifont == ''
+             let font='font=Lucida_Console:h10'
+          else
+            let font='font='.substitute(&guifont, '^[^:]*', 'Lucida_Console','')
+          endif
+        elseif has('gui_athena') || has('gui_gtk') || &guifont=~'^\(-[^-]\+\)\{14}'
+          if &guifont == ''
+            let font='font=-b&h-lucidatypewriter-medium-r-normal-*-*-140-*-*-m-*-iso8859-1' 
+          else 
+            let font='font='.substitute(&guifont,'^\(-[^-]\+\)\{5}', '-*-*-140-*-*-m-*-iso8859-1','')
+          endif
+        elseif has('gui_kde')
+          " let font='font=Bitstream\ Vera\ Sans\ Mono/12/-1/5/50/0/0/0/0/0'
         endif
       endif
-      if font=='' | let font='gui=bold' | endif
-      exe 'SynColor doxygenCodeWord             term=bold cterm=bold '.font
+    endif
+    if font=='' | let font='gui=bold' | endif
+    exe 'SynColor doxygenCodeWord             term=bold cterm=bold '.font
+    if (exists('g:doxygen_enhanced_color') && g:doxygen_enhanced_color) || (exists('g:doxygen_enhanced_colour') && g:doxygen_enhanced_colour)
       if &background=='light'
         SynColor doxygenComment ctermfg=DarkRed guifg=DarkRed
         SynColor doxygenBrief cterm=bold ctermfg=Cyan guifg=DarkBlue gui=bold
