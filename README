@@ -1,0 +1,12 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=5
+
+This Script has been moved into Vim7.
+
+:set syntax=cpp.doxygen
+
+Provides DoxyGen Highlighting on top of c/c++/idl/java.  DoxyGen is close to JavaDoc that it should be fine for JavaDoc as well.  It supports most of the keywords in DoxyGen in one way or another.
+
+There may be some problems where doxygen tags need to be included in exclusion groups of the c/c++/java/idl files.
+
+At the moment, it uses non-conventional colours, which I think is good, as it differentiates it from the source-code.  Please let me know if your opinion differs, especially if you have a set of standard defaults that would be appropriate.
+
