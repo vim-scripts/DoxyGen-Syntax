@@ -24,16 +24,16 @@ following to your .vimrc. >
 There are a couple of variables that have an affect on syntax highlighting, and
 are to do with non-standard highlighting options.
 
-Variable			Effect ~
+Variable			Default     Effect ~
 g:doxygen_enhanced_color
-g:doxygen_enhanced_colour	Use non-standard highlighting for doxygen comments.
+g:doxygen_enhanced_colour	0           Use non-standard highlighting for doxygen comments.
 
-doxygen_my_rendering		Disable rendering of HTML bold, italic and
-html_my_rendering		underline.
+doxygen_my_rendering		0           Disable rendering of HTML bold, italic and
+html_my_rendering		            underline.
 
-doxygen_javadoc_autobrief	Set to 0 to disable javadoc autobrief colour highlighting.
+doxygen_javadoc_autobrief	1           Set to 0 to disable javadoc autobrief colour highlighting.
 
-doxygen_end_punctuation		Set to regexp match for the ending punctuation of brief (default '[.]')
+doxygen_end_punctuation		'[.]'       Set to regexp match for the ending punctuation of brief 
 
 There are also some hilight groups worth mentioning as they can be useful in
 configuration.
