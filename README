@@ -2,9 +2,15 @@ This is a mirror of http://www.vim.org/scripts/script.php?script_id=5
 
 This Script has been moved into Vim7.
 
+To set the highlighting automatically on all newly opened c, cpp and idl files, please use
+
+let g:load_doxygen_syntax=1
+
+in your .vimrc.
+
 :set syntax=cpp.doxygen
 
-Provides DoxyGen Highlighting on top of c/c++/idl/java.  DoxyGen is close to JavaDoc that it should be fine for JavaDoc as well.  It supports most of the keywords in DoxyGen in one way or another.
+Provides DoxyGen Highlighting on top of c/c++/idl/java.  DoxyGen is close to JavaDoc that it should be fine for JavaDoc as well.  It supports most of the keywords in DoxyGen in one way or another. Please note this will work only for the current buffer.
 
 There may be some problems where doxygen tags need to be included in exclusion groups of the c/c++/java/idl files.
 
